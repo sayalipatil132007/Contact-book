@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Book</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #f2f4f8; margin: 0; padding: 20px; color: #222; }
+  .wrap { max-width: 700px; margin: 0 auto; }
+  h1 { text-align: center; color: #2b4c7e; }
+  .card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #bbb; border-radius: 5px; font-size: 15px; }
+  button { padding: 9px 14px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; color: #fff; background: #2b4c7e; }
+  button.edit { background: #e09f1f; }
+  button.del { background: #c0392b; }
+  button.cancel { background: #777; }
+  .contact { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding: 10px 0; flex-wrap: wrap; }
+  .contact:last-child { border-bottom: none; }
+  .info small { color: #555; display: block; }
+  #msg { text-align: center; min-height: 20px; font-weight: bold; }
+  .ok { color: #1e8449; } .err { color: #c0392b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Contact Book</h1>
+
+  <div class="card">
+    <h3 id="formTitle">Add Contact</h3>
+    <input id="name" placeholder="Name">
+    <input id="phone" placeholder="Phone (digits only)">
+    <input id="email" placeholder="Email">
+    <input id="address" placeholder="Address">
+    <button id="saveBtn" onclick="saveContact()">Add Contact</button>
+    <button id="cancelBtn" class="cancel" style="display:none" onclick="resetForm()">Cancel</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div class="card">
+    <input id="search" placeholder="Search by name or phone" oninput="render()">
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+  let contacts = [];
+  let editIndex = null;
+
+  // Load saved contacts from the browser
+  try { contacts = JSON.parse(localStorage.getItem("contacts")) || []; } catch (e) { contacts = []; }
+
+  function persist() {
+    try { localStorage.setItem("contacts", JSON.stringify(contacts)); } catch (e) {}
+  }
+
+  function showMsg(text, ok) {
+    const m = document.getElementById("msg");
+    m.textContent = text;
+    m.className = ok ? "ok" : "err";
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function saveContact() {
+    const name = document.getElementById("name").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const address = document.getElementById("address").value.trim();
+
+    if (!name) return showMsg("Name cannot be empty.", false);
+    if (!/^\d{7,}$/.test(phone)) return showMsg("Enter a valid phone number (digits only, at least 7).", false);
+    if (contacts.some((c, i) => c.phone === phone && i !== editIndex))
+      return showMsg("A contact with this phone number already exists.", false);
+
+    if (editIndex === null) {
+      contacts.push({ name, phone, email, address });
+      showMsg("Contact added successfully!", true);
+    } else {
+      contacts[editIndex] = { name, phone, email, address };
+      showMsg("Contact updated successfully!", true);
+    }
+    persist();
+    resetForm();
+    render();
+  }
+
+  function editContact(i) {
+    const c = contacts[i];
+    document.getElementById("name").value = c.name;
+    document.getElementById("phone").value = c.phone;
+    document.getElementById("email").value = c.email;
+    document.getElementById("address").value = c.address;
+    editIndex = i;
+    document.getElementById("formTitle").textContent = "Update Contact";
+    document.getElementById("saveBtn").textContent = "Update Contact";
+    document.getElementById("cancelBtn").style.display = "inline-block";
+    window.scrollTo(0, 0);
+  }
+
+  function deleteContact(i) {
+    if (confirm("Delete " + contacts[i].name + "?")) {
+      contacts.splice(i, 1);
+      persist();
+      showMsg("Contact deleted.", true);
+      render();
+    }
+  }
+
+  function resetForm() {
+    ["name", "phone", "email", "address"].forEach(id => document.getElementById(id).value = "");
+    editIndex = null;
+    document.getElementById("formTitle").textContent = "Add Contact";
+    document.getElementById("saveBtn").textContent = "Add Contact";
+    document.getElementById("cancelBtn").style.display = "none";
+  }
+
+  function render() {
+    const term = document.getElementById("search").value.trim().toLowerCase();
+    const rows = contacts
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.name.toLowerCase().includes(term) || c.phone.includes(term))
+      .sort((a, b) => a.c.name.toLowerCase().localeCompare(b.c.name.toLowerCase()));
+
+    const list = document.getElementById("list");
+    if (rows.length === 0) {
+      list.innerHTML = "<p>No contacts found.</p>";
+      return;
+    }
+    list.innerHTML = rows.map(({ c, i }) => `
+      <div class="contact">
+        <div class="info">
+          <strong>${esc(c.name)}</strong>
+          <small>Phone: ${esc(c.phone)}</small>
+          <small>Email: ${esc(c.email)}</small>
+          <small>Address: ${esc(c.address)}</small>
+        </div>
+        <div>
+          <button class="edit" onclick="editContact(${i})">Edit</button>
+          <button class="del" onclick="deleteContact(${i})">Delete</button>
+        </div>
+      </div>`).join("");
+  }
+
+  render();
+</script>
+</body>
+</html>
